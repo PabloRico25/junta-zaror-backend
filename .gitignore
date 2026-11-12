@@ -1,0 +1,12 @@
+﻿# Secretos locales (clave del JWT, contraseñas de MySQL)
+.env
+*.env
+
+# IntelliJ y Maven
+.idea/
+*.iml
+target/
+
+# Logs
+*.log
+logs/
