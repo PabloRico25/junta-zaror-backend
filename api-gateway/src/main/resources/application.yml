@@ -27,16 +27,16 @@ spring:
       routes:
 
         - id: auth-service
-          uri: http://localhost:9094
+          uri: http://127.0.0.1:9094
           predicates:
             - Path=/auth/**,/usuarios/**
 
         - id: reserva-service
-          uri: http://localhost:9092
+          uri: http://127.0.0.1:9092
           predicates:
             - Path=/dependencias/**,/reservas/**,/accesos/**
 
         - id: pago-service
-          uri: http://localhost:9095
+          uri: http://127.0.0.1:9095
           predicates:
             - Path=/pagos/**
