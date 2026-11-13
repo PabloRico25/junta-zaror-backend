@@ -24,7 +24,7 @@ flowchart LR
 ```
 
 - La app solo habla con el gateway. Los tres servicios escuchan en `127.0.0.1`, así que desde otro aparato no se llega a ellos directamente.
-- El gateway valida el token en cada ruta, salvo `POST /auth/login`. Cada servicio lo valida otra vez con la misma clave, para que un servicio no dependa de que alguien más haya revisado antes.
+- El gateway valida el token en cada ruta, salvo las de `/auth`. `reserva-service` y `pago-service` lo validan otra vez con la misma clave, para no depender de que alguien más haya revisado antes. `auth-service` es quien firma los tokens y confía en el gateway: no valida ninguno, y por eso solo escucha en `127.0.0.1`.
 - Cada servicio tiene su propia base de datos (`jz_auth`, `jz_reservas`, `jz_pagos`). `pago-service` pregunta a `reserva-service` si una reserva está confirmada antes de aceptar un pago de arriendo. Esa llamada va con `WebClient` por el gateway, como en el ejemplo del docente.
 - Capas de cada servicio: `controller`, `service`, `repository`, `model`, `dto`, `exception` y `config`. Un `DataLoader` carga los datos de ejemplo la primera vez.
 
