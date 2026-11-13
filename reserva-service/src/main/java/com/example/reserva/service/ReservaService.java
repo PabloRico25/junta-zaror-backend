@@ -1,5 +1,6 @@
 package com.example.reserva.service;
 
+import com.example.reserva.dto.Bloque;
 import com.example.reserva.dto.ReservaRequest;
 import com.example.reserva.model.Reserva;
 import com.example.reserva.repository.DependenciaRepository;
@@ -144,6 +145,31 @@ public class ReservaService {
         reserva.setEstado("RECHAZADA");
         reserva.setGestionadaPorId(usuarioId);
         return reservaRepository.save(reserva);
+    }
+
+    // Bloques ocupados (CONFIRMADA y PENDIENTE) de una sala en un día.
+    // El vecino ve solo las horas; el id del vecino solo lo ve la directiva.
+    public List<Bloque> ocupacion(Long dependenciaId, String fecha, String rol) {
+        if (dependenciaId == null || !dependenciaRepository.existsById(dependenciaId)) {
+            throw pedidoInvalido("Elige una dependencia");
+        }
+        LocalDate dia = leerFecha(fecha);
+
+        boolean esDirectiva = "DIRECTIVA".equals(rol);
+        return reservaRepository
+                .findByDependenciaIdAndFechaAndEstadoInOrderByHoraInicioAsc(
+                        dependenciaId, dia.toString(), List.of("CONFIRMADA", "PENDIENTE"))
+                .stream()
+                .map(r -> new Bloque(r.getHoraInicio(), r.getHoraFin(), r.getEstado(),
+                        esDirectiva ? r.getVecinoId() : null))
+                .toList();
+    }
+
+    // Lo usa pago-service: dice si la reserva existe y está confirmada.
+    public boolean estaConfirmada(Long id) {
+        return reservaRepository.findById(id)
+                .map(r -> "CONFIRMADA".equals(r.getEstado()))
+                .orElse(false);
     }
 
     private Reserva buscar(Long id) {

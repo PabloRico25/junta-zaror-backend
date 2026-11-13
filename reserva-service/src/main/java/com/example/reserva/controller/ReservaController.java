@@ -1,5 +1,6 @@
 package com.example.reserva.controller;
 
+import com.example.reserva.dto.Bloque;
 import com.example.reserva.dto.ReservaRequest;
 import com.example.reserva.model.Reserva;
 import com.example.reserva.service.ReservaService;
@@ -37,11 +38,26 @@ public class ReservaController {
         return ResponseEntity.ok(reservaService.listar(usuarioId, rol, estado));
     }
 
+    // Bloques ocupados de una sala en un día, para mostrar la disponibilidad
+    @GetMapping("/ocupacion")
+    public ResponseEntity<List<Bloque>> ocupacion(@AuthenticationPrincipal Jwt jwt,
+                                                  @RequestParam(required = false) Long dependenciaId,
+                                                  @RequestParam(required = false) String fecha) {
+        String rol = jwt.getClaimAsString("rol");
+        return ResponseEntity.ok(reservaService.ocupacion(dependenciaId, fecha, rol));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<Reserva> obtener(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
         Long usuarioId = Long.valueOf(jwt.getSubject());
         String rol = jwt.getClaimAsString("rol");
         return ResponseEntity.ok(reservaService.obtener(id, usuarioId, rol));
+    }
+
+    // Lo usa pago-service para saber si una reserva se puede pagar
+    @GetMapping("/{id}/confirmada")
+    public ResponseEntity<Boolean> confirmada(@PathVariable Long id) {
+        return ResponseEntity.ok(reservaService.estaConfirmada(id));
     }
 
     // Un vecino pide una reserva; queda PENDIENTE hasta que la Secretaría la confirme

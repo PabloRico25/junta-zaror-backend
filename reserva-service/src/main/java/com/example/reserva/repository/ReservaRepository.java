@@ -33,4 +33,7 @@ public interface ReservaRepository extends JpaRepository<Reserva, Long> {
                        @Param("horaInicio") String horaInicio,
                        @Param("horaFin") String horaFin,
                        @Param("excluirId") Long excluirId);
+    // Las reservas de una sala en un día con alguno de los estados dados, por hora de inicio
+    List<Reserva> findByDependenciaIdAndFechaAndEstadoInOrderByHoraInicioAsc(
+            Long dependenciaId, String fecha, List<String> estados);
 }
