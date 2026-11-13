@@ -1,11 +1,15 @@
 package com.example.pago.controller;
 
+import com.example.pago.dto.PagoRequest;
 import com.example.pago.model.Pago;
 import com.example.pago.service.PagoService;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -32,5 +36,16 @@ public class PagoController {
     @GetMapping("/pagadas")
     public ResponseEntity<List<Long>> pagadas() {
         return ResponseEntity.ok(pagoService.reservasPagadas());
+    }
+
+    // Solo Tesorería registra pagos. Se pasa el token para que pago-service pueda
+    // preguntarle a reserva-service si la reserva está confirmada.
+    @PostMapping
+    public ResponseEntity<Pago> registrar(@AuthenticationPrincipal Jwt jwt,
+                                          @RequestBody PagoRequest pedido) {
+        Long usuarioId = Long.valueOf(jwt.getSubject());
+        String cargo = jwt.getClaimAsString("cargo");
+        Pago creado = pagoService.crear(usuarioId, cargo, jwt.getTokenValue(), pedido);
+        return ResponseEntity.status(HttpStatus.CREATED).body(creado);
     }
 }

@@ -14,7 +14,9 @@ public class Pago {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Reserva que se paga. Vacío en los consumos básicos.
+    // Reserva que se paga. Vacío en los consumos básicos. Es único: un arriendo no se paga dos veces
+    // (los consumos no tienen reserva y la base permite varios valores vacíos).
+    @Column(unique = true)
     private Long reservaId;
 
     // ARRIENDO o CONSUMO_BASICO
