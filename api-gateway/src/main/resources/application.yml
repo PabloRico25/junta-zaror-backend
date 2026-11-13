@@ -16,6 +16,14 @@ spring:
 
   cloud:
     gateway:
+      # Tiempos del cliente que el gateway usa para llamar a los servicios:
+      # una conexión ociosa se descarta a los 5 s (Tomcat las cierra a los 20 s) y, si un servicio
+      # no contesta, el gateway falla en segundos en vez de quedarse esperando para siempre.
+      httpclient:
+        connect-timeout: 2000
+        response-timeout: 10s
+        pool:
+          max-idle-time: 5s
       routes:
 
         - id: auth-service
