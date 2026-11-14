@@ -86,7 +86,7 @@ Requisitos: Java 21, MySQL en el puerto 3306 y un usuario `jz_user` con permiso 
 3. Apagar los servicios: `.\parar.ps1`.
 4. Volver a los datos de ejemplo: `.\reiniciar-datos.ps1`.
 
-Desde el emulador de Android el gateway es `http://10.0.2.2:9090`. Desde un teléfono real es la IP del computador en la red local.
+Desde el emulador de Android el gateway es `http://10.0.2.2:9090`. Desde un teléfono real es la IP del computador en la red local o, en la presentación, su IP de Tailscale (ver [Operación y presentación](#operación-y-presentación)).
 
 **Usuarios de prueba.** La clave de todos es `1234`.
 
@@ -96,6 +96,37 @@ Desde el emulador de Android el gateway es `http://10.0.2.2:9090`. Desde un tel�
 | maria.torres@zaror.test | Directiva, Secretaría |
 | luis.rojas@zaror.test | Directiva, Tesorería |
 | carmen.vidal@zaror.test | Directiva, Presidencia |
+
+## Operación y presentación
+
+### Scripts
+
+Se corren desde la carpeta del backend, con `powershell -ExecutionPolicy Bypass -File .\<script>` si la política de PowerShell no deja correrlos directamente.
+
+| Script | Qué hace |
+|---|---|
+| `levantar.ps1` | Enciende MySQL y los cuatro servicios, uno tras otro, y espera a que cada uno abra su puerto. Se puede correr varias veces: lo que ya está encendido se deja como está. Los mensajes van a `logs\<servicio>.log` |
+| `parar.ps1` | Apaga los cuatro servicios por su puerto. Deja MySQL encendido; con `-ConMySQL` lo apaga también |
+| `reiniciar-datos.ps1` | Deja las bases con los datos de ejemplo recién cargados. Apaga los servicios, borra las tablas de reservas, accesos y pagos, y vuelve a encender todo: cada `DataLoader` las llena de nuevo con las fechas de hoy. Los usuarios no se tocan. Pide la clave de `root` de MySQL |
+
+Puertos: gateway 9090, `reserva-service` 9092, `auth-service` 9094, `pago-service` 9095 y MySQL 3306.
+
+### Acceso desde otros aparatos
+
+En la presentación el backend corre en un notebook y los teléfonos lo alcanzan por Tailscale, con la IP `100.65.13.28`, que no cambia con la red. Dos cosas lo permiten y lo limitan:
+
+- **Firewall de Windows.** Una regla de entrada deja pasar el puerto 9090 solo desde el rango de Tailscale (`100.64.0.0/10`). Se crea una vez, en PowerShell como administrador:
+
+  ```
+  New-NetFirewallRule -DisplayName "Junta Zaror gateway 9090 (Tailscale)" -Direction Inbound -Protocol TCP -LocalPort 9090 -RemoteAddress 100.64.0.0/10 -Action Allow
+  ```
+
+  Los otros tres servicios no necesitan regla: escuchan solo en `127.0.0.1`.
+- **Política de acceso de Tailscale.** Cada aparato necesita Tailscale y un permiso en la política de la cuenta para llegar al notebook solo por el puerto TCP 9090. Lo que no está permitido ahí queda bloqueado.
+
+Para comprobar que todo el camino funciona, desde el navegador de un aparato conectado a Tailscale se abre `http://100.65.13.28:9090/dependencias`. Debe devolver las dos salas, porque esa ruta no pide token.
+
+La app se compila con esa dirección en `urlServidor`: ver el [README de la app](https://github.com/PabloRico25/AppJuntaVecinos). La sesión de una persona dura 12 horas y la de una puerta, 7 días.
 
 ## Pruebas
 
@@ -115,5 +146,6 @@ cd reserva-service
 - **Comprobantes.** El servidor guarda solo la referencia que envía la app. La imagen no se sube al servidor.
 - **Notificaciones.** El servidor no las envía. La app avisa dentro de la pantalla.
 - **Sin conexión.** La app guarda una copia local de lo último que descargó, pero no encola operaciones para enviarlas después.
+- **Disponibilidad.** Todo corre en un solo equipo. Si ese equipo se apaga o pierde la conexión, la app muestra lo último que descargó, pero no puede pedir, confirmar ni pagar nada.
 - **Docker.** Hay `Dockerfile` solo para `api-gateway` y `auth-service`, y no se ejecutan: el backend se enciende con los scripts de PowerShell.
 - **QR.** La firma del QR se genera y se comprueba dentro de la app. El servidor solo recuerda qué QR ya se usó.
