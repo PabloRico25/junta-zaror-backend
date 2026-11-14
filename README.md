@@ -107,7 +107,7 @@ Se corren desde la carpeta del backend, con `powershell -ExecutionPolicy Bypass 
 |---|---|
 | `levantar.ps1` | Enciende MySQL y los cuatro servicios, uno tras otro, y espera a que cada uno abra su puerto. Se puede correr varias veces: lo que ya está encendido se deja como está. Los mensajes van a `logs\<servicio>.log` |
 | `parar.ps1` | Apaga los cuatro servicios por su puerto. Deja MySQL encendido; con `-ConMySQL` lo apaga también |
-| `reiniciar-datos.ps1` | Deja las bases con los datos de ejemplo recién cargados. Apaga los servicios, borra las tablas de reservas, accesos y pagos, y vuelve a encender todo: cada `DataLoader` las llena de nuevo con las fechas de hoy. Los usuarios no se tocan. Pide la clave de `root` de MySQL |
+| `reiniciar-datos.ps1` | Deja las bases con los datos de ejemplo recién cargados. Apaga los servicios, borra las tablas de reservas, accesos y pagos, y vuelve a encender todo: cada `DataLoader` las llena de nuevo con fechas calculadas a partir de hoy. Los usuarios no se tocan. Pide la clave de `root` de MySQL |
 
 Puertos: gateway 9090, `reserva-service` 9092, `auth-service` 9094, `pago-service` 9095 y MySQL 3306.
 
