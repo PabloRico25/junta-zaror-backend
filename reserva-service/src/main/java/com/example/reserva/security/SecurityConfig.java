@@ -3,6 +3,7 @@ package com.example.reserva.security;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
@@ -18,12 +19,15 @@ public class SecurityConfig {
     @Value("${jwt.secret}")
     private String secreto;
 
-    // Toda petición necesita un token válido; sin él, la respuesta es 401
+    // Toda petición necesita un token válido; sin él, la respuesta es 401. La única excepción es leer la lista de salas
+    // (GET /dependencias): un aparato que va a ser la puerta la pide antes de que nadie inicie sesión en él.
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
-                .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(HttpMethod.GET, "/dependencias").permitAll()
+                        .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> {}));
         return http.build();
     }

@@ -11,20 +11,10 @@ Backend de microservicios de la app [AppJuntaVecinos](https://github.com/PabloRi
 
 ## Arquitectura
 
-```mermaid
-flowchart LR
-    app["App Android<br/>Retrofit + Room"] -->|"HTTP, Bearer token"| gw["api-gateway :9090<br/>valida el JWT"]
-    gw -->|"/auth, /usuarios"| auth["auth-service :9094"]
-    gw -->|"/dependencias, /reservas, /accesos"| res["reserva-service :9092"]
-    gw -->|"/pagos"| pago["pago-service :9095"]
-    pago -->|"WebClient: /reservas/id/confirmada"| gw
-    auth --- db1[("jz_auth")]
-    res --- db2[("jz_reservas")]
-    pago --- db3[("jz_pagos")]
-```
+![Arquitectura de Junta Zaror: la app, el gateway, los tres servicios y sus bases de datos](docs/arquitectura_junta_zaror.png)
 
 - La app solo habla con el gateway. Los tres servicios escuchan en `127.0.0.1`, así que desde otro aparato no se llega a ellos directamente.
-- El gateway valida el token en cada ruta, salvo las de `/auth`. `reserva-service` y `pago-service` lo validan otra vez con la misma clave, para no depender de que alguien más haya revisado antes. `auth-service` es quien firma los tokens y confía en el gateway: no valida ninguno, y por eso solo escucha en `127.0.0.1`.
+- El gateway valida el token en cada ruta, salvo las de `/auth` y la lectura de `GET /dependencias`. `reserva-service` y `pago-service` lo validan otra vez con la misma clave, para no depender de que alguien más haya revisado antes. `auth-service` es quien firma los tokens y confía en el gateway: no valida ninguno, y por eso solo escucha en `127.0.0.1`.
 - Cada servicio tiene su propia base de datos (`jz_auth`, `jz_reservas`, `jz_pagos`). `pago-service` pregunta a `reserva-service` si una reserva está confirmada antes de aceptar un pago de arriendo. Esa llamada va con `WebClient` por el gateway, como en el ejemplo del docente.
 - Capas de cada servicio: `controller`, `service`, `repository`, `model`, `dto`, `exception` y `config`. Un `DataLoader` carga los datos de ejemplo la primera vez.
 
@@ -54,7 +44,7 @@ Todos salen por `http://<equipo>:9090`. Las respuestas son JSON y llevan `Author
 
 | Método y ruta | Quién | Qué hace |
 |---|---|---|
-| `GET /dependencias` | Cualquier sesión | Las dos salas |
+| `GET /dependencias` | Cualquiera, **sin token** | Las dos salas. Es la única ruta pública además del login: un aparato que va a ser la puerta las necesita antes de que alguien inicie sesión en él |
 | `GET /reservas` | Cualquier sesión | El vecino recibe las suyas y la directiva todas. Filtro opcional `?estado=` |
 | `GET /reservas/{id}` | Dueño o directiva | Una reserva |
 | `POST /reservas` | Vecino | Crea una reserva pendiente. Valida fecha, horas y choque con una reserva confirmada |

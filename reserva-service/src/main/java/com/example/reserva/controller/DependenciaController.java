@@ -19,7 +19,7 @@ public class DependenciaController {
         this.dependenciaService = dependenciaService;
     }
 
-    // Cualquier sesión con token válido puede ver las dependencias
+    // Cualquiera puede ver las dependencias, también sin sesión (lo permite SecurityConfig): la puerta las necesita para activarse
     @GetMapping
     public ResponseEntity<List<Dependencia>> listar() {
         return ResponseEntity.ok(dependenciaService.listar());

@@ -59,7 +59,7 @@ Bloque       { horaInicio, horaFin, estado, vecinoId }                (vecinoId 
 
 | Método y ruta | Quién | Qué hace | Reemplaza |
 |---|---|---|---|
-| `GET /dependencias` | Cualquier sesión | Las dos salas | `obtenerDependencias` |
+| `GET /dependencias` | Cualquiera, sin token | Las dos salas. Pública porque la puerta las pide antes de iniciar sesión | `obtenerDependencias` |
 | `GET /reservas` | Cualquier sesión | El vecino recibe solo las suyas; la directiva, todas. Orden: fecha y hora de inicio. Filtro opcional `?estado=` | `observarReservas`, `observarTodasLasReservas` |
 | `GET /reservas/{id}` | Dueño o directiva | Una reserva | `buscarReserva` |
 | `POST /reservas` | `VECINO` | Crea una reserva `PENDIENTE` | `crearReserva` |
