@@ -87,7 +87,7 @@ Solo las reservas confirmadas bloquean el horario. El checkbox del reglamento es
 
 ### Reglas de los cambios de estado
 - `cancelar`: solo el dueño y solo si está `PENDIENTE`; si no, 409 con `Solo se puede cancelar una reserva pendiente`.
-- `confirmar`: solo `SECRETARIA` (403 con `Solo la Secretaría puede confirmar reservas`) y solo `PENDIENTE`. Vuelve a revisar el cruce: 409 con `No se puede confirmar: ese horario ya está ocupado por una reserva confirmada`. Guarda `gestionadaPorId` desde el token.
+- `confirmar`: solo `SECRETARIA` (403 con `Solo la Secretaría puede confirmar reservas`) y solo `PENDIENTE`. Vuelve a revisar el cruce: 409 con `No se puede confirmar: ese horario ya está ocupado por una reserva confirmada`. Guarda `gestionadaPorId` desde el token. Al confirmar, las demás reservas `PENDIENTE` de la misma sala y día que se cruzan con ese horario pasan a `RECHAZADA` (con el mismo `gestionadaPorId`), porque ya no se podrían confirmar.
 - `rechazar`: igual, 403 con `Solo la Secretaría puede rechazar reservas`. Guarda `gestionadaPorId`.
 
 ### Accesos (puerta y Escanear)

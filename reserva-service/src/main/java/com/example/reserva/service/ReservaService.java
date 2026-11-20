@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
@@ -114,6 +115,9 @@ public class ReservaService {
 
     // Solo la Secretaría confirma. Antes de confirmar se vuelve a revisar el choque,
     // porque otra reserva pudo confirmarse mientras esta esperaba.
+    // Al confirmar, las demás solicitudes PENDIENTES de la misma sala que se cruzan con este
+    // horario pasan a RECHAZADA: ya no se podrían confirmar y no deben seguir figurando como solicitadas.
+    @Transactional
     public Reserva confirmar(Long id, Long usuarioId, String cargo) {
         logger.info("Confirmando reserva id={}", id);
         if (!"SECRETARIA".equals(cargo)) {
@@ -134,7 +138,17 @@ public class ReservaService {
 
         reserva.setEstado("CONFIRMADA");
         reserva.setGestionadaPorId(usuarioId);
-        return reservaRepository.save(reserva);
+        Reserva confirmada = reservaRepository.save(reserva);
+
+        List<Reserva> desplazadas = reservaRepository.buscarPendientesQueChocan(confirmada.getDependenciaId(),
+                confirmada.getFecha(), confirmada.getHoraInicio(), confirmada.getHoraFin(), confirmada.getId());
+        for (Reserva otra : desplazadas) {
+            logger.info("Rechazando reserva id={} por cruce con la reserva confirmada id={}", otra.getId(), confirmada.getId());
+            otra.setEstado("RECHAZADA");
+            otra.setGestionadaPorId(usuarioId);
+        }
+        reservaRepository.saveAll(desplazadas);
+        return confirmada;
     }
 
     // Solo la Secretaría rechaza, y solo una reserva PENDIENTE.

@@ -227,6 +227,23 @@ class ReservaServiceTest {
         assertEquals(4L, confirmada.getGestionadaPorId());
     }
 
+    @Test
+    void confirmarRechazaLasPendientesQueSeCruzan() {
+        Reserva otra = new Reserva(8L, 1L, 6L, fechaEn(5), "11:00", "13:00", "PENDIENTE", fechaEn(0), null);
+        when(reservaRepository.findById(5L)).thenReturn(Optional.of(reserva(5L, 3L, "PENDIENTE")));
+        when(reservaRepository.contarChoques(1L, fechaEn(5), "10:00", "12:00", 5L)).thenReturn(0L);
+        when(reservaRepository.save(any(Reserva.class))).thenAnswer(invocacion -> invocacion.getArgument(0));
+        when(reservaRepository.buscarPendientesQueChocan(1L, fechaEn(5), "10:00", "12:00", 5L))
+                .thenReturn(List.of(otra));
+
+        Reserva confirmada = reservaService.confirmar(5L, 4L, "SECRETARIA");
+
+        assertEquals("CONFIRMADA", confirmada.getEstado());
+        assertEquals("RECHAZADA", otra.getEstado());
+        assertEquals(4L, otra.getGestionadaPorId());
+        verify(reservaRepository).saveAll(List.of(otra));
+    }
+
     // ---------- rechazar ----------
 
     @Test

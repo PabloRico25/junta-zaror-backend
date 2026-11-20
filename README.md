@@ -85,7 +85,7 @@ Todos salen por `http://<equipo>:9090`. Las respuestas son JSON y llevan `Author
 | `GET /reservas/{id}` | Dueño o directiva | Una reserva |
 | `POST /reservas` | Vecino | Crea una reserva pendiente. Valida fecha, horas y choque con una reserva confirmada |
 | `PUT /reservas/{id}/cancelar` | Dueño | Cancela, solo si está pendiente |
-| `PUT /reservas/{id}/confirmar` | Secretaría | Confirma, solo si está pendiente. Vuelve a revisar el choque de horario |
+| `PUT /reservas/{id}/confirmar` | Secretaría | Confirma, solo si está pendiente. Vuelve a revisar el choque de horario y rechaza las otras pendientes que se cruzan con él |
 | `PUT /reservas/{id}/rechazar` | Secretaría | Rechaza, solo si está pendiente |
 | `GET /reservas/ocupacion?dependenciaId=&fecha=` | Cualquier sesión | Bloques ocupados de una sala y un día. Los nombres solo los ve la directiva |
 | `GET /reservas/{id}/confirmada` | Otro servicio | Dice si la reserva existe y está confirmada |

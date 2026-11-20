@@ -32,6 +32,19 @@ public interface ReservaRepository extends JpaRepository<Reserva, Long> {
                        @Param("horaInicio") String horaInicio,
                        @Param("horaFin") String horaFin,
                        @Param("excluirId") Long excluirId);
+
+    // Las reservas PENDIENTES de la misma sala y día que se cruzan con el horario dado.
+    // Se usan al confirmar una reserva: esas solicitudes ya no pueden concretarse.
+    @Query("select r from Reserva r "
+            + "where r.dependenciaId = :dependenciaId and r.fecha = :fecha "
+            + "and r.estado = 'PENDIENTE' and r.id <> :excluirId "
+            + "and r.horaInicio < :horaFin and :horaInicio < r.horaFin")
+    List<Reserva> buscarPendientesQueChocan(@Param("dependenciaId") Long dependenciaId,
+                                            @Param("fecha") String fecha,
+                                            @Param("horaInicio") String horaInicio,
+                                            @Param("horaFin") String horaFin,
+                                            @Param("excluirId") Long excluirId);
+
     // Las reservas de una sala en un día con alguno de los estados dados, por hora de inicio
     List<Reserva> findByDependenciaIdAndFechaAndEstadoInOrderByHoraInicioAsc(
             Long dependenciaId, String fecha, List<String> estados);
