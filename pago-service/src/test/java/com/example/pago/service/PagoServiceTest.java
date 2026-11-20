@@ -1,7 +1,9 @@
 package com.example.pago.service;
 
 import com.example.pago.dto.PagoRequest;
+import com.example.pago.model.HistorialPago;
 import com.example.pago.model.Pago;
+import com.example.pago.repository.HistorialPagoRepository;
 import com.example.pago.repository.PagoRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,11 +21,13 @@ import reactor.core.publisher.Mono;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -35,6 +39,9 @@ class PagoServiceTest {
 
     @Mock
     private PagoRepository pagoRepository;
+
+    @Mock
+    private HistorialPagoRepository historialRepository;
 
     // ---------- el otro servicio, de mentira ----------
 
@@ -60,7 +67,7 @@ class PagoServiceTest {
     }
 
     private PagoService servicio(ReservaFalsa reserva) {
-        return new PagoService(pagoRepository, reserva.webClient, "/reservas/%d/confirmada");
+        return new PagoService(pagoRepository, historialRepository, reserva.webClient, "/reservas/%d/confirmada");
     }
 
     // ---------- ayudas ----------
@@ -308,5 +315,169 @@ class PagoServiceTest {
                 new Pago(3L, 7L, "ARRIENDO", "", 40000, "2026-11-09", null, 5L, "")));
 
         assertEquals(List.of(8L, 7L), servicio(new ReservaFalsa("true")).reservasPagadas());
+    }
+
+    // ---------- buscar, editar y eliminar ----------
+
+    private static final String MOTIVO = "Boleta corregida por la empresa";
+
+    private PagoRequest conMotivo(PagoRequest pedido) {
+        pedido.setMotivo(MOTIVO);
+        return pedido;
+    }
+
+    @Test
+    void buscarUnPagoQueNoExisteDa404() {
+        when(pagoRepository.findById(99L)).thenReturn(Optional.empty());
+
+        esperarError(HttpStatus.NOT_FOUND, "Ese pago no existe",
+                () -> servicio(new ReservaFalsa("true")).buscar(99L, "DIRECTIVA"));
+    }
+
+    @Test
+    void buscarComoVecinoEntregaElPagoSinLoPrivado() {
+        when(pagoRepository.findById(1L)).thenReturn(Optional.of(pagoDeArriendo()));
+
+        Pago visto = servicio(new ReservaFalsa("true")).buscar(1L, "VECINO");
+
+        assertEquals(60000, visto.getMonto());
+        assertNull(visto.getReservaId());
+        assertNull(visto.getComprobanteUri());
+        assertEquals("Transferencia", servicio(new ReservaFalsa("true")).buscar(1L, "DIRECTIVA").getDescripcion());
+    }
+
+    @Test
+    void editarCambiaMontoFechaYDescripcionPeroNoElTipoNiLaReserva() {
+        when(pagoRepository.findById(1L)).thenReturn(Optional.of(pagoDeArriendo()));
+        when(pagoRepository.save(any(Pago.class))).thenAnswer(invocacion -> invocacion.getArgument(0));
+        PagoRequest pedido = consumo("AGUA", 65000L, fechaEn(-1));
+        pedido.setDescripcion("  Monto corregido  ");
+        pedido.setMotivo(MOTIVO);
+        pedido.setReservaId(99L);
+
+        Pago editado = servicio(new ReservaFalsa("true")).actualizar(1L, 5L, "TESORERIA", pedido);
+
+        assertEquals(65000, editado.getMonto());
+        assertEquals(fechaEn(-1), editado.getFecha());
+        assertEquals("Monto corregido", editado.getDescripcion());
+        assertEquals("ARRIENDO", editado.getTipo());
+        assertEquals(8L, editado.getReservaId());
+        assertEquals("", editado.getCategoria());
+    }
+
+    @Test
+    void editarUnConsumoPuedeCambiarSuCategoria() {
+        when(pagoRepository.findById(7L)).thenReturn(Optional.of(
+                new Pago(7L, null, "CONSUMO_BASICO", "AGUA", 24200, "2026-11-12", null, 5L, "")));
+        when(pagoRepository.save(any(Pago.class))).thenAnswer(invocacion -> invocacion.getArgument(0));
+
+        Pago editado = servicio(new ReservaFalsa("true")).actualizar(7L, 5L, "TESORERIA", conMotivo(consumo("GAS", 24200L, fechaEn(0))));
+
+        assertEquals("GAS", editado.getCategoria());
+    }
+
+    @Test
+    void editarConDatosInvalidosDa400YNoGuarda() {
+        when(pagoRepository.findById(1L)).thenReturn(Optional.of(pagoDeArriendo()));
+        PagoService servicio = servicio(new ReservaFalsa("true"));
+
+        esperarError(HttpStatus.BAD_REQUEST, "El monto debe ser mayor que 0",
+                () -> servicio.actualizar(1L, 5L, "TESORERIA", conMotivo(arriendo(8L, 0L, fechaEn(0)))));
+        esperarError(HttpStatus.BAD_REQUEST, "La fecha del pago no puede ser futura",
+                () -> servicio.actualizar(1L, 5L, "TESORERIA", conMotivo(arriendo(8L, 1000L, fechaEn(3)))));
+        verify(pagoRepository, never()).save(any(Pago.class));
+    }
+
+    @Test
+    void soloTesoreriaPuedeEditarOEliminar() {
+        PagoService servicio = servicio(new ReservaFalsa("true"));
+
+        esperarError(HttpStatus.FORBIDDEN, "Solo la Tesorería puede editar pagos",
+                () -> servicio.actualizar(1L, 4L, "SECRETARIA", consumo("AGUA", 1000L, fechaEn(0))));
+        esperarError(HttpStatus.FORBIDDEN, "Solo la Tesorería puede eliminar pagos",
+                () -> servicio.eliminar(1L, 4L, "SECRETARIA", MOTIVO));
+        verify(pagoRepository, never()).deleteById(any());
+    }
+
+    @Test
+    void eliminarBorraElPagoYLoAnotaEnElHistorialConSuMotivo() {
+        when(pagoRepository.findById(1L)).thenReturn(Optional.of(pagoDeArriendo()));
+
+        servicio(new ReservaFalsa("true")).eliminar(1L, 5L, "TESORERIA", "  " + MOTIVO + "  ");
+
+        verify(pagoRepository).deleteById(1L);
+        verify(historialRepository).save(argThat(h -> "ELIMINADO".equals(h.getAccion())
+                && Integer.valueOf(60000).equals(h.getMontoAnterior()) && h.getMontoNuevo() == null
+                && MOTIVO.equals(h.getMotivo()) && "TESORERIA".equals(h.getCargo()) && h.getPagoId() == 1L));
+    }
+
+    @Test
+    void eliminarUnPagoQueNoExisteDa404() {
+        when(pagoRepository.findById(99L)).thenReturn(Optional.empty());
+
+        esperarError(HttpStatus.NOT_FOUND, "Ese pago no existe",
+                () -> servicio(new ReservaFalsa("true")).eliminar(99L, 5L, "TESORERIA", MOTIVO));
+        verify(pagoRepository, never()).deleteById(any());
+    }
+
+    @Test
+    void editarOEliminarSinMotivoDa400YNoGuardaNada() {
+        PagoService servicio = servicio(new ReservaFalsa("true"));
+        PagoRequest sinMotivo = consumo("AGUA", 1000L, fechaEn(0));
+        PagoRequest corto = consumo("AGUA", 1000L, fechaEn(0));
+        corto.setMotivo("error");
+
+        esperarError(HttpStatus.BAD_REQUEST, "Escribe el motivo del cambio (al menos 10 letras)",
+                () -> servicio.actualizar(1L, 5L, "TESORERIA", sinMotivo));
+        esperarError(HttpStatus.BAD_REQUEST, "Escribe el motivo del cambio (al menos 10 letras)",
+                () -> servicio.actualizar(1L, 5L, "TESORERIA", corto));
+        esperarError(HttpStatus.BAD_REQUEST, "Escribe el motivo del cambio (al menos 10 letras)",
+                () -> servicio.eliminar(1L, 5L, "TESORERIA", "   "));
+        verify(pagoRepository, never()).save(any(Pago.class));
+        verify(pagoRepository, never()).deleteById(any());
+        verify(historialRepository, never()).save(any(HistorialPago.class));
+    }
+
+    @Test
+    void editarAnotaElMontoAnteriorElNuevoYElMotivo() {
+        when(pagoRepository.findById(1L)).thenReturn(Optional.of(pagoDeArriendo()));
+        when(pagoRepository.save(any(Pago.class))).thenAnswer(invocacion -> invocacion.getArgument(0));
+
+        servicio(new ReservaFalsa("true")).actualizar(1L, 5L, "TESORERIA", conMotivo(arriendo(8L, 65000L, fechaEn(0))));
+
+        verify(historialRepository).save(argThat(h -> "EDITADO".equals(h.getAccion())
+                && Integer.valueOf(60000).equals(h.getMontoAnterior()) && Integer.valueOf(65000).equals(h.getMontoNuevo())
+                && MOTIVO.equals(h.getMotivo()) && h.getUsuarioId() == 5L && h.getFechaHora() != null));
+    }
+
+    @Test
+    void registrarTambienQuedaEnElHistorialSinMotivo() {
+        when(pagoRepository.saveAndFlush(any(Pago.class))).thenAnswer(invocacion -> {
+            Pago p = invocacion.getArgument(0);
+            p.setId(12L);
+            return p;
+        });
+
+        registrar(servicio(new ReservaFalsa("true")), consumo("GAS", 24000L, fechaEn(0)));
+
+        verify(historialRepository).save(argThat(h -> "REGISTRADO".equals(h.getAccion()) && h.getPagoId() == 12L
+                && h.getMontoAnterior() == null && Integer.valueOf(24000).equals(h.getMontoNuevo())
+                && "".equals(h.getMotivo())));
+    }
+
+    @Test
+    void elHistorialLoVeTodaLaComunidadPeroElVecinoNoRecibeElIdDeLaPersona() {
+        HistorialPago cambio = new HistorialPago(3L, 1L, "EDITADO", "ARRIENDO", "", 60000, 65000, "2026-11-10",
+                MOTIVO, "TESORERIA", 5L, "2026-11-19T21:00:00");
+        when(historialRepository.findAllByOrderByIdDesc()).thenReturn(List.of(cambio));
+        PagoService servicio = servicio(new ReservaFalsa("true"));
+
+        HistorialPago visto = servicio.listarHistorial("VECINO").get(0);
+
+        assertEquals(MOTIVO, visto.getMotivo());
+        assertEquals("TESORERIA", visto.getCargo());
+        assertEquals(65000, visto.getMontoNuevo());
+        assertNull(visto.getUsuarioId());
+        assertEquals(5L, servicio.listarHistorial("DIRECTIVA").get(0).getUsuarioId());
     }
 }

@@ -22,4 +22,7 @@ public class PagoRequest {
 
     private String comprobanteUri;
     private String descripcion;
+
+    // Solo al editar: por qué se corrige el pago. Obligatorio, queda en el historial.
+    private String motivo;
 }

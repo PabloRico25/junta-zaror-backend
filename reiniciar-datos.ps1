@@ -1,5 +1,5 @@
 ﻿# reiniciar-datos.ps1: deja las bases con los datos de ejemplo recién cargados.
-# Apaga los servicios, borra las tablas de reservas, accesos y pagos, y vuelve a encenderlos:
+# Apaga los servicios, borra las tablas de reservas, accesos, pagos e historial de pagos, y vuelve a encenderlos:
 # al arrancar, cada DataLoader las llena de nuevo con las fechas de hoy. Los usuarios no se tocan.
 # Enciende MySQL si está apagado. Pide la clave de root (está en C:\Herramientas\mysql\credenciales_root.txt).
 
@@ -15,7 +15,7 @@ if (-not (Get-NetTCPConnection -State Listen -LocalPort 3306 -ErrorAction Silent
     }
 }
 
-$sql = "DROP TABLE IF EXISTS jz_reservas.accesos, jz_reservas.reservas, jz_reservas.dependencias, jz_pagos.pagos;"
+$sql = "DROP TABLE IF EXISTS jz_reservas.accesos, jz_reservas.reservas, jz_reservas.dependencias, jz_pagos.pagos, jz_pagos.historial_pago;"
 & "C:\Program Files\MySQL\MySQL Server 8.4\bin\mysql.exe" -u root -p -e $sql
 if ($LASTEXITCODE -ne 0) {
     Write-Host "No se pudieron borrar las tablas; los servicios quedaron apagados." -ForegroundColor Red

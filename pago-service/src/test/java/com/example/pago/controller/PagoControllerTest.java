@@ -2,6 +2,7 @@ package com.example.pago.controller;
 
 import com.example.pago.dto.PagoRequest;
 import com.example.pago.exception.GlobalExceptionHandler;
+import com.example.pago.model.HistorialPago;
 import com.example.pago.model.Pago;
 import com.example.pago.service.PagoService;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,8 +29,10 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -158,5 +161,76 @@ class PagoControllerTest {
                         .content("{\"tipo\":"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("El cuerpo de la petición no es válido"));
+    }
+
+    @Test
+    void obtenerUnPagoPorSuIdDevuelve200() throws Exception {
+        como("5", "DIRECTIVA", "TESORERIA");
+        when(pagoService.buscar(7L, "DIRECTIVA")).thenReturn(consumo());
+
+        mockMvc.perform(get("/pagos/7"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(7))
+                .andExpect(jsonPath("$.categoria").value("AGUA"));
+    }
+
+    @Test
+    void unPagoQueNoExisteDa404() throws Exception {
+        como("5", "DIRECTIVA", "TESORERIA");
+        when(pagoService.buscar(99L, "DIRECTIVA"))
+                .thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "Ese pago no existe"));
+
+        mockMvc.perform(get("/pagos/99"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Ese pago no existe"));
+    }
+
+    @Test
+    void editarDevuelve200ConElPagoCorregido() throws Exception {
+        como("5", "DIRECTIVA", "TESORERIA");
+        Pago corregido = new Pago(7L, null, "CONSUMO_BASICO", "GAS", 30000, "2026-11-12", null, 5L, "");
+        when(pagoService.actualizar(eq(7L), eq(5L), eq("TESORERIA"), any(PagoRequest.class))).thenReturn(corregido);
+
+        mockMvc.perform(put("/pagos/7")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"categoria\":\"GAS\",\"monto\":30000,\"fecha\":\"2026-11-12\",\"motivo\":\"Boleta corregida\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.monto").value(30000))
+                .andExpect(jsonPath("$.categoria").value("GAS"));
+    }
+
+    @Test
+    void eliminarDevuelve204SinCuerpo() throws Exception {
+        como("5", "DIRECTIVA", "TESORERIA");
+
+        mockMvc.perform(delete("/pagos/7").param("motivo", "Pago duplicado por error"))
+                .andExpect(status().isNoContent());
+
+        verify(pagoService).eliminar(7L, 5L, "TESORERIA", "Pago duplicado por error");
+    }
+
+    @Test
+    void eliminarSinSerTesoreriaDa403() throws Exception {
+        como("4", "DIRECTIVA", "SECRETARIA");
+        org.mockito.Mockito.doThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "Solo la Tesorería puede eliminar pagos"))
+                .when(pagoService).eliminar(7L, 4L, "SECRETARIA", null);
+
+        mockMvc.perform(delete("/pagos/7"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("Solo la Tesorería puede eliminar pagos"));
+    }
+
+    @Test
+    void elHistorialDevuelve200ParaCualquierSesion() throws Exception {
+        como("1", "VECINO", "");
+        when(pagoService.listarHistorial("VECINO")).thenReturn(List.of(new HistorialPago(3L, 7L, "ELIMINADO",
+                "CONSUMO_BASICO", "AGUA", 24200, null, "2026-11-12", "Pago duplicado por error", "TESORERIA", null,
+                "2026-11-19T21:00:00")));
+
+        mockMvc.perform(get("/pagos/historial"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].accion").value("ELIMINADO"))
+                .andExpect(jsonPath("$[0].motivo").value("Pago duplicado por error"))
+                .andExpect(jsonPath("$[0].usuarioId").isEmpty());
     }
 }
