@@ -53,9 +53,12 @@ public class UsuarioService {
         return new LoginResponse(token, UsuarioDTO.fromModel(usuario));
     }
 
+    // La lista la puede pedir cualquier sesión (la app muestra nombres), así que va sin correos: un vecino no
+    // necesita el correo de los demás. Se envía vacío y no null, porque la app lo declara no nulo.
     public List<UsuarioDTO> listar() {
         return usuarioRepository.findAll().stream()
                 .map(UsuarioDTO::fromModel)
+                .peek(dto -> dto.setCorreo(""))
                 .collect(Collectors.toList());
     }
 }
