@@ -1,4 +1,4 @@
-package com.example.reserva;
+package com.example.reserva.config;
 
 import com.example.reserva.model.Dependencia;
 import com.example.reserva.model.Reserva;

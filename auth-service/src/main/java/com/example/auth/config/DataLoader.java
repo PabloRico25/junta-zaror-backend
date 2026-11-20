@@ -1,4 +1,4 @@
-package com.example.auth;
+package com.example.auth.config;
 
 import com.example.auth.model.Usuario;
 import com.example.auth.repository.UsuarioRepository;

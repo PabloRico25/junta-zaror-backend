@@ -3,6 +3,8 @@ package com.example.reserva.service;
 import com.example.reserva.model.Acceso;
 import com.example.reserva.repository.AccesoRepository;
 import com.example.reserva.repository.ReservaRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -12,6 +14,8 @@ import java.util.List;
 
 @Service
 public class AccesoService {
+
+    private static final Logger logger = LoggerFactory.getLogger(AccesoService.class);
 
     private final AccesoRepository accesoRepository;
     private final ReservaRepository reservaRepository;
@@ -31,6 +35,7 @@ public class AccesoService {
 
     // Registra el ingreso de una reserva. Un mismo código no puede entrar dos veces.
     public Acceso registrar(String rol, Acceso pedido) {
+        logger.info("Registrando acceso de la puerta");
         soloDirectiva(rol, "Solo la directiva puede registrar ingresos");
 
         if (pedido.getReservaId() == null || !reservaRepository.existsById(pedido.getReservaId())) {

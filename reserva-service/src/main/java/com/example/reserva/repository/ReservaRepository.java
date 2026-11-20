@@ -22,8 +22,7 @@ public interface ReservaRepository extends JpaRepository<Reserva, Long> {
     List<Reserva> findByVecinoIdAndEstadoOrderByFechaAscHoraInicioAsc(Long vecinoId, String estado);
 
     // Cuenta las reservas CONFIRMADAS de la misma sala y día que se cruzan con el horario pedido.
-    // Dos horarios se cruzan si inicioA < finB y inicioB < finA.
-    // excluirId evita que una reserva choque consigo misma al confirmarla (al crear se pasa 0).
+    // excluirId evita que una reserva choque consigo misma (al crear se pasa 0).
     @Query("select count(r) from Reserva r "
             + "where r.dependenciaId = :dependenciaId and r.fecha = :fecha "
             + "and r.estado = 'CONFIRMADA' and r.id <> :excluirId "

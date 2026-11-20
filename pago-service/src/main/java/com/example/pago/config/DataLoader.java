@@ -1,4 +1,4 @@
-package com.example.pago;
+package com.example.pago.config;
 
 import com.example.pago.model.Pago;
 import com.example.pago.repository.PagoRepository;

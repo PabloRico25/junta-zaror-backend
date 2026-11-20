@@ -1,0 +1,9 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Backend completo" type="CompoundRunConfigurationType">
+    <toRun type="MavenRunConfiguration" name="auth-service" />
+    <toRun type="MavenRunConfiguration" name="reserva-service" />
+    <toRun type="MavenRunConfiguration" name="pago-service" />
+    <toRun type="MavenRunConfiguration" name="api-gateway" />
+    <method v="2" />
+  </configuration>
+</component>

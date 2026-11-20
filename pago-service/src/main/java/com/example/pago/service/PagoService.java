@@ -3,6 +3,8 @@ package com.example.pago.service;
 import com.example.pago.dto.PagoRequest;
 import com.example.pago.model.Pago;
 import com.example.pago.repository.PagoRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -20,6 +22,8 @@ import java.util.Objects;
 @Service
 public class PagoService {
 
+    private static final Logger logger = LoggerFactory.getLogger(PagoService.class);
+
     private final PagoRepository pagoRepository;
     private final WebClient webClient;
     private final String rutaConfirmada;
@@ -31,9 +35,7 @@ public class PagoService {
         this.rutaConfirmada = rutaConfirmada;
     }
 
-    // Todos los pagos, los más nuevos primero. La directiva los ve completos; el vecino ve montos y
-    // categorías, pero no la reserva, el comprobante ni quién lo registró. Se arman copias nuevas
-    // para no tocar los datos guardados.
+    // Todos los pagos, los más nuevos primero. El vecino los ve sin reserva, comprobante ni quién los registró.
     public List<Pago> listar(String rol) {
         List<Pago> pagos = pagoRepository.findAllByOrderByFechaDescIdDesc();
 
@@ -58,6 +60,7 @@ public class PagoService {
     // Registra un pago. Solo Tesorería. Un arriendo exige una reserva confirmada (se le pregunta a
     // reserva-service con el mismo token) y no puede repetirse para la misma reserva.
     public Pago crear(Long usuarioId, String cargo, String token, PagoRequest pedido) {
+        logger.info("Registrando pago: usuarioId={}", usuarioId);
         if (!"TESORERIA".equals(cargo)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Solo la Tesorería puede registrar pagos");
         }

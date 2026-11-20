@@ -16,29 +16,27 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 
 import java.time.OffsetDateTime;
 
-// Atrapa todos los errores y los devuelve con la misma forma (ApiErrorResponse).
-// Extiende la clase de Spring que ya conoce los errores comunes: JSON roto, parámetro mal escrito,
-// ruta que no existe, método no permitido. Aquí solo se decide qué mensaje ve la app.
+// Atrapa los errores y los devuelve siempre con la misma forma (ApiErrorResponse).
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-    // Cualquier error imprevisto: se registra completo en el servidor, pero la app solo recibe un mensaje genérico
+    // Error imprevisto: se registra en el servidor y la app recibe un mensaje genérico
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Object> handleGeneral(Exception ex, WebRequest request) {
         logger.error("Error no controlado: {}", ex.getMessage(), ex);
         return construir(HttpStatus.INTERNAL_SERVER_ERROR, "Ha ocurrido un error interno", request);
     }
 
-    // Por aquí pasan los errores de Spring y los ResponseStatusException que lanzamos a mano
+    // Aquí llegan los errores de Spring y los ResponseStatusException
     @Override
     protected ResponseEntity<Object> handleExceptionInternal(Exception ex, Object body, HttpHeaders headers,
                                                              HttpStatusCode statusCode, WebRequest request) {
         return construir(statusCode, mensajeDe(ex, statusCode), request);
     }
 
-    // Los mensajes que escribimos a mano se conservan; los técnicos de Spring se reemplazan
+    // Se conservan nuestros mensajes; los técnicos de Spring se cambian
     private String mensajeDe(Exception ex, HttpStatusCode status) {
         if (ex instanceof ResponseStatusException rse && rse.getReason() != null) {
             return rse.getReason();

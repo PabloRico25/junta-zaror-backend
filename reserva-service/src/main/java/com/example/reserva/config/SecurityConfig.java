@@ -1,4 +1,4 @@
-package com.example.reserva.security;
+package com.example.reserva.config;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;

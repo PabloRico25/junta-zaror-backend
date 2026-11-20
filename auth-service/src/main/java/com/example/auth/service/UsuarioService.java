@@ -5,6 +5,8 @@ import com.example.auth.dto.LoginResponse;
 import com.example.auth.dto.UsuarioDTO;
 import com.example.auth.model.Usuario;
 import com.example.auth.repository.UsuarioRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -16,6 +18,8 @@ import java.util.stream.Collectors;
 @Service
 public class UsuarioService {
 
+    private static final Logger logger = LoggerFactory.getLogger(UsuarioService.class);
+
     @Autowired
     private UsuarioRepository usuarioRepository;
 
@@ -26,6 +30,7 @@ public class UsuarioService {
     private HashService hashService;
 
     public LoginResponse login(LoginRequest pedido) {
+        logger.info("Intento de login");
         if (pedido.getCorreo() == null || pedido.getCorreo().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Escribe tu correo");
         }

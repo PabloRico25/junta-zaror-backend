@@ -5,6 +5,8 @@ import com.example.reserva.dto.ReservaRequest;
 import com.example.reserva.model.Reserva;
 import com.example.reserva.repository.DependenciaRepository;
 import com.example.reserva.repository.ReservaRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -16,6 +18,8 @@ import java.util.List;
 
 @Service
 public class ReservaService {
+
+    private static final Logger logger = LoggerFactory.getLogger(ReservaService.class);
 
     private final ReservaRepository reservaRepository;
     private final DependenciaRepository dependenciaRepository;
@@ -44,8 +48,7 @@ public class ReservaService {
         return reservaRepository.findByVecinoIdOrderByFechaAscHoraInicioAsc(usuarioId);
     }
 
-    // La puede ver su dueño o la directiva. A un vecino que pide la de otro se le dice
-    // que no existe, para no revelar que esa reserva está en el sistema.
+    // La ve su dueño o la directiva. Si otro vecino la pide, se responde que no existe.
     public Reserva obtener(Long id, Long usuarioId, String rol) {
         Reserva reserva = buscar(id);
 
@@ -59,6 +62,7 @@ public class ReservaService {
 
     // Crea una reserva PENDIENTE. El vecino sale del token; el estado y la fecha de solicitud los pone el servidor.
     public Reserva crear(Long vecinoId, String rol, ReservaRequest pedido) {
+        logger.info("Creando reserva: vecinoId={}, dependenciaId={}, fecha={}", vecinoId, pedido.getDependenciaId(), pedido.getFecha());
         if (!"VECINO".equals(rol)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Solo un vecino puede pedir una reserva");
         }
@@ -94,6 +98,7 @@ public class ReservaService {
 
     // Solo el dueño puede cancelar, y solo mientras la reserva está PENDIENTE.
     public Reserva cancelar(Long id, Long usuarioId) {
+        logger.info("Cancelando reserva id={}", id);
         Reserva reserva = buscar(id);
 
         if (!reserva.getVecinoId().equals(usuarioId)) {
@@ -110,6 +115,7 @@ public class ReservaService {
     // Solo la Secretaría confirma. Antes de confirmar se vuelve a revisar el choque,
     // porque otra reserva pudo confirmarse mientras esta esperaba.
     public Reserva confirmar(Long id, Long usuarioId, String cargo) {
+        logger.info("Confirmando reserva id={}", id);
         if (!"SECRETARIA".equals(cargo)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Solo la Secretaría puede confirmar reservas");
         }
@@ -133,6 +139,7 @@ public class ReservaService {
 
     // Solo la Secretaría rechaza, y solo una reserva PENDIENTE.
     public Reserva rechazar(Long id, Long usuarioId, String cargo) {
+        logger.info("Rechazando reserva id={}", id);
         if (!"SECRETARIA".equals(cargo)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Solo la Secretaría puede rechazar reservas");
         }
