@@ -21,6 +21,7 @@ Escrito el 2026-11-06 a partir del código de `AppJuntaVecinos` en la rama `parc
 |---|---|
 | 200 | Lectura o actualización correcta |
 | 201 | Creación correcta (`POST /reservas`, `POST /pagos`, `POST /accesos`) |
+| 204 | Eliminación correcta, sin cuerpo (`DELETE /pagos/{id}`) |
 | 400 | Datos inválidos (falta un campo, fecha pasada, monto 0…) |
 | 401 | Sin token, token vencido o clave incorrecta |
 | 403 | El token es válido pero el rol o el cargo no puede hacer esto |
@@ -49,7 +50,7 @@ Bloque       { horaInicio, horaFin, estado, vecinoId }                (vecinoId 
 | Método y ruta | Quién | Cuerpo | Respuesta |
 |---|---|---|---|
 | `POST /auth/login` | Cualquiera | `{ "correo", "clave", "dispositivo" }` (`dispositivo` es opcional) | 200 `{ "token", "usuario": Usuario }`. 401 con `"Correo o clave incorrectos"`. Con `"dispositivo": "PUERTA"` solo entra la directiva (403 `Solo la directiva puede activar la puerta`) y el token dura 7 días |
-| `GET /usuarios` | Cualquier sesión | | 200 lista de `Usuario` |
+| `GET /usuarios` | Cualquier sesión | | 200 lista de `Usuario`, con `correo` vacío (`""`) |
 
 - El token (JWT) lleva `sub` (id), `rol`, `cargo` y `nombre`, y vence a las 12 horas (7 días el de la puerta, porque el aparato queda activo sin que nadie lo toque).
 - La clave se guarda con hash SHA-256 en el servidor (el docente aceptó cualquier hash; el ejemplo usa SHA-1 y aquí se sube a SHA-256, igual que la app). La app deja de calcular el hash: envía la clave tal cual por la red local de desarrollo. En producción iría sobre HTTPS; aquí se documenta como limitación.
@@ -100,6 +101,10 @@ Solo las reservas confirmadas bloquean el horario. El checkbox del reglamento es
 | `GET /pagos` | Cualquier sesión | Todos los pagos, más nuevos primero. Para un vecino vienen en `null` `reservaId`, `comprobanteUri` y `registradoPorId`, y la `descripcion` viene vacía (`""`) | `observarPagos` |
 | `GET /pagos/pagadas` | Cualquier sesión | Lista de `reservaId` con pago de arriendo | `observarReservasPagadas`, `reservaPagada` |
 | `POST /pagos` | cargo `TESORERIA` | Registra un pago | `crearPago` |
+| `GET /pagos/{id}` | Cualquier sesión | Un pago; para un vecino, con lo privado vacío como en la lista. 404 si no existe | (no se usa en la app) |
+| `PUT /pagos/{id}` | cargo `TESORERIA` | Corrige `monto`, `fecha`, `descripcion` y, en un consumo, `categoria`, con las mismas reglas de `POST`. `motivo` es obligatorio (10 a 200 letras) y queda en el historial. 404 si no existe | `actualizarPago` |
+| `DELETE /pagos/{id}?motivo=...` | cargo `TESORERIA` | Elimina el pago. El motivo es obligatorio y queda en el historial. Responde 204 sin cuerpo. 404 si no existe | `eliminarPago` |
+| `GET /pagos/historial` | Cualquier sesión | Lista de `HistorialPago`, el más nuevo primero: `accion` (REGISTRADO, EDITADO, ELIMINADO), `montoAnterior`, `montoNuevo`, `motivo`, `cargo`, `fechaHora`. Para un vecino, `usuarioId` viene en `null` | `obtenerHistorialPagos` |
 
 ### Reglas de `POST /pagos`
 Cuerpo: `{ "reservaId", "tipo", "categoria", "monto", "fecha", "comprobanteUri", "descripcion" }`. El servidor completa `registradoPorId`.

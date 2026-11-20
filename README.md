@@ -5,9 +5,9 @@ Backend de microservicios de la app [AppJuntaVecinos](https://github.com/PabloRi
 | | |
 |---|---|
 | Asignatura | DSY1105 Desarrollo de Aplicaciones Móviles, Duoc UC |
-| Evaluación | Parcial 4 |
+| Evaluación | Parcial 4 (encargo) y Parcial 5 (defensa) |
 | Integrantes | Pablo Alexander Rico Rodríguez, William Martín Rodríguez Troncoso |
-| Pila | Java 21, Spring Boot 4.0.5, Spring Cloud Gateway, Spring Security, JPA con MySQL, JWT |
+| Pila | Java 21, Spring Boot 4.0.5 (el gateway, 3.3.5, como en el ejemplo del docente), Spring Cloud Gateway, Spring Security, JPA con MySQL, JWT |
 
 ## Arquitectura
 
@@ -29,6 +29,42 @@ Backend de microservicios de la app [AppJuntaVecinos](https://github.com/PabloRi
 
 Se mantuvieron los nombres del ejemplo de código del docente. La propuesta dice que los nombres y los atributos pueden ajustarse. Lo que no se implementó está en la sección Alcance y limitaciones.
 
+## Modelo de datos
+
+Cada servicio es dueño de sus tablas y ninguno lee las de otro: `pago-service` pregunta por la reserva a `reserva-service`, no a su base. Las tablas las crea JPA al arrancar (`ddl-auto=update`).
+
+| Base | Tabla (entidad) | Campos | Para qué |
+|---|---|---|---|
+| `jz_auth` | `Usuario` | id, nombre, correo, clave (hash SHA-256), rol, cargo | Las cuentas. El rol es VECINO o DIRECTIVA; el cargo, SECRETARIA, TESORERIA o PRESIDENCIA |
+| `jz_reservas` | `Dependencia` | id, nombre | Las salas: Salón Principal y Sala Multiuso |
+| `jz_reservas` | `Reserva` | id, dependenciaId, vecinoId, fecha, horaInicio, horaFin, estado, fechaSolicitud, gestionadaPorId | Las solicitudes y su estado: PENDIENTE, CONFIRMADA, RECHAZADA o CANCELADA |
+| `jz_reservas` | `Acceso` | reservaId, fecha, hora | Los QR que ya entraron por la puerta. reservaId es la clave: un QR no entra dos veces |
+| `jz_pagos` | `Pago` | id, reservaId, tipo, categoria, monto, fecha, comprobanteUri, registradoPorId, descripcion | Arriendos y consumos básicos. reservaId es único: un arriendo no se paga dos veces |
+| `jz_pagos` | `HistorialPago` | id, pagoId, accion, tipo, categoria, montoAnterior, montoNuevo, fechaPago, motivo, cargo, usuarioId, fechaHora | Cada pago registrado, editado o eliminado. Lo escribe solo el servidor y no hay ruta para cambiarlo |
+
+Las fechas viajan y se guardan como texto año-mes-día y las horas como `HH:00`, así se comparan y ordenan como texto.
+
+## Qué viene del ejemplo del docente y qué es nuestro
+
+El ejemplo de referencia es `Microservicios-Docker-Con-JWT`, que se vio en clase.
+
+| Pieza | Origen |
+|---|---|
+| Gateway con Spring Cloud Gateway que reparte por ruta | Ejemplo del docente |
+| Login que firma un JWT con jjwt, y validación del JWT con `oauth2-resource-server` | Ejemplo del docente |
+| Capas `controller`, `service`, `repository`, `model`, `dto`, `exception` y `config`, y un `DataLoader` | Ejemplo del docente |
+| Un servicio que llama a otro con `WebClient` | Ejemplo del docente (`pago-service` y `compra-service`) |
+| Cuerpo de error `timestamp`, `status`, `error`, `message`, `path` | Ejemplo del docente |
+| JPA con MySQL, Lombok y pruebas con JUnit 5, Mockito y `MockMvc` | Ejemplo del docente |
+| Clave con hash | El ejemplo usa SHA-1; aquí, SHA-256 |
+| Permisos por rol y cargo leídos del token (`@AuthenticationPrincipal Jwt`) | Nuestro: el token del ejemplo solo lleva el correo |
+| `ResponseStatusException` con un manejador central | Nuestro: el ejemplo usa una excepción propia por tipo. El cuerpo del error es el mismo |
+| Servicios que escuchan solo en `127.0.0.1` y claves en un `.env` | Nuestro: el ejemplo deja la clave del JWT escrita en el código |
+| Reglas de reserva, de pago, del QR usado y el historial de pagos con motivo | Nuestro: es la lógica del caso |
+| Scripts de PowerShell para encender y apagar | Nuestro: el ejemplo se enciende con Docker |
+
+Del ejemplo no se usaron Docker Compose, Liquibase, Swagger, HATEOAS, Actuator, Datafaker, `@Valid` ni los DTO de respuesta: el caso no los necesitaba. Hay `Dockerfile` para `api-gateway` y `auth-service`, copiados del ejemplo, que no se ejecutan.
+
 ## Endpoints
 
 Todos salen por `http://<equipo>:9090`. Las respuestas son JSON y llevan `Authorization: Bearer <token>`, salvo el login. El detalle de cada cuerpo, de cada regla y de cada mensaje de error está en [CONTRATO_API.md](CONTRATO_API.md), el acuerdo entre la app y el backend.
@@ -38,7 +74,7 @@ Todos salen por `http://<equipo>:9090`. Las respuestas son JSON y llevan `Author
 | Método y ruta | Quién | Qué hace |
 |---|---|---|
 | `POST /auth/login` | Cualquiera | Entra con correo y clave. Responde `{ token, usuario }`. Con `"dispositivo": "PUERTA"` solo entra la directiva y el token dura 7 días |
-| `GET /usuarios` | Cualquier sesión | Lista de usuarios, sin la clave |
+| `GET /usuarios` | Cualquier sesión | Lista de usuarios con nombre, rol y cargo. Sin la clave y sin el correo (va vacío): un vecino no necesita el correo de los demás |
 
 ### reserva-service
 
@@ -63,6 +99,10 @@ Todos salen por `http://<equipo>:9090`. Las respuestas son JSON y llevan `Author
 | `GET /pagos` | Cualquier sesión | Pagos, el más nuevo primero. Al vecino no se le entregan la reserva, el comprobante ni quién lo registró |
 | `GET /pagos/pagadas` | Cualquier sesión | Reservas que ya tienen su pago de arriendo |
 | `POST /pagos` | Tesorería | Registra un pago de arriendo o de un consumo básico |
+| `GET /pagos/{id}` | Cualquier sesión | Un pago. Al vecino le llega sin lo privado, como en la lista |
+| `PUT /pagos/{id}` | Tesorería | Corrige el monto, la fecha, la descripción y, en un consumo, la categoría. El tipo y la reserva no cambian. Exige `motivo` (10 a 200 letras) |
+| `DELETE /pagos/{id}?motivo=...` | Tesorería | Elimina un pago mal registrado (204). Si era un arriendo, la reserva vuelve a quedar por cobrar. Exige el motivo |
+| `GET /pagos/historial` | Cualquier sesión | Cada pago registrado, editado o eliminado, con el monto anterior y el nuevo, el motivo y el cargo de quien lo hizo. Nadie puede editarlo ni borrarlo. Al vecino no le llega el id de la persona |
 
 ### Códigos de respuesta
 
@@ -107,7 +147,7 @@ Se corren desde la carpeta del backend, con `powershell -ExecutionPolicy Bypass 
 |---|---|
 | `levantar.ps1` | Enciende MySQL y los cuatro servicios, uno tras otro, y espera a que cada uno abra su puerto. Se puede correr varias veces: lo que ya está encendido se deja como está. Los mensajes van a `logs\<servicio>.log` |
 | `parar.ps1` | Apaga los cuatro servicios por su puerto. Deja MySQL encendido; con `-ConMySQL` lo apaga también |
-| `reiniciar-datos.ps1` | Deja las bases con los datos de ejemplo recién cargados. Apaga los servicios, borra las tablas de reservas, accesos y pagos, y vuelve a encender todo: cada `DataLoader` las llena de nuevo con fechas calculadas a partir de hoy. Los usuarios no se tocan. Pide la clave de `root` de MySQL |
+| `reiniciar-datos.ps1` | Deja las bases con los datos de ejemplo recién cargados. Apaga los servicios, borra las tablas de reservas, accesos, pagos e historial de pagos, y vuelve a encender todo: cada `DataLoader` las llena de nuevo con fechas calculadas a partir de hoy. Los usuarios no se tocan. Pide la clave de `root` de MySQL |
 
 Puertos: gateway 9090, `reserva-service` 9092, `auth-service` 9094, `pago-service` 9095 y MySQL 3306.
 
@@ -130,22 +170,23 @@ La app se compila con esa dirección en `urlServidor`: ver el [README de la app]
 
 ## Pruebas
 
-68 pruebas automáticas: 45 en `reserva-service` y 23 en `pago-service`, entre servicio (Mockito) y controlador (`MockMvc`). Cubren las reglas de negocio, los permisos por cargo, los códigos de error, el control del QR repetido y la llamada de `pago-service` a `reserva-service`.
+87 pruebas automáticas: 45 en `reserva-service`, 41 en `pago-service` y 1 en `auth-service`. En los dos primeros hay pruebas del servicio (Mockito) y del controlador (`MockMvc`, con un `Jwt` de prueba). Cubren las reglas de negocio, los permisos por cargo, los códigos de error, el control del QR repetido, la llamada de `pago-service` a `reserva-service`, la edición y eliminación de pagos con motivo y el historial.
 
 ```
 cd reserva-service
 .\mvnw.cmd test
 ```
 
-`auth-service` y `api-gateway` no tienen pruebas automáticas: se probaron a mano con Postman y con la app.
+`auth-service` solo tiene la prueba de arranque de la plantilla, y `api-gateway` ninguna: se probaron a mano con Postman y con la app.
 
 ## Alcance y limitaciones
 
 - **Datos y claves.** Todo es ficticio. La clave se guarda con hash SHA-256. La app la envía sin cifrar por la red local de desarrollo, y en un uso real iría sobre HTTPS.
-- **Tablas de la propuesta no creadas.** No existen `historial_reserva`, `categoria_movimiento`, `comprobante`, `informe_financiero` ni `rol`. Quién gestionó una reserva se guarda en la propia reserva, la categoría del pago es un texto y el rol y el cargo del usuario también. `historial_reserva` es lo primero que se sumaría.
+- **Tablas de la propuesta.** Existe el historial de pagos (`HistorialPago`). No existen `historial_reserva`, `categoria_movimiento`, `comprobante`, `informe_financiero` ni `rol`: quién gestionó una reserva se guarda en la propia reserva, la categoría del pago es un texto y el rol y el cargo del usuario también. `historial_reserva` es lo primero que se sumaría.
 - **Comprobantes.** El servidor guarda solo la referencia que envía la app. La imagen no se sube al servidor.
-- **Notificaciones.** El servidor no las envía. La app avisa dentro de la pantalla.
+- **Notificaciones.** El servidor no envía notificaciones push. La app lo consulta cada 10 segundos con la sesión abierta y muestra notificaciones locales. El historial de pagos sí queda guardado en el servidor.
+- **Token de la puerta.** Dura 7 días y lleva los mismos permisos de la cuenta de la directiva que la activó. Para un uso real debería servir solo para registrar ingresos.
 - **Sin conexión.** La app guarda una copia local de lo último que descargó, pero no encola operaciones para enviarlas después.
 - **Disponibilidad.** Todo corre en un solo equipo. Si ese equipo se apaga o pierde la conexión, la app muestra lo último que descargó, pero no puede pedir, confirmar ni pagar nada.
 - **Docker.** Hay `Dockerfile` solo para `api-gateway` y `auth-service`, y no se ejecutan: el backend se enciende con los scripts de PowerShell.
-- **QR.** La firma del QR se genera y se comprueba dentro de la app. El servidor solo recuerda qué QR ya se usó.
+- **QR.** La firma del QR se genera y se comprueba dentro de la app. El servidor solo recuerda qué QR ya se usó: no se revisa de nuevo si el pago sigue registrado.
